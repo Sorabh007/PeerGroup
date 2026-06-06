@@ -108,7 +108,7 @@
     <div class="logo">my peer group <span>/ beta</span></div>
     <div class="topbar-pill" id="counter-pill">
       <i class="ti ti-users" style="font-size:12px;"></i>
-      <span id="counter-num">—</span> on the waitlist
+      <span id="counter-num">...</span> on the waitlist
     </div>
   </div>
 
@@ -239,56 +239,59 @@
   const btn = document.getElementById('submit-btn');
   const counterNum = document.getElementById('counter-num');
 
-  // Namespace: mypeergroup-sorabh007 | Key: waitlist
-  // First visit sets the count; every form submit increments it
-  const COUNT_URL = 'https://api.countapi.xyz/';
-  const NAMESPACE = 'mypeergroup-sorabh007';
-  const KEY = 'waitlist';
-  const SEED = 47; // starting offset so it doesn't show 0
+  // --- COUNTER LOGIC ---
+  const SEED = 47; // Base number of users
 
-  async function getCount() {
-    try {
-      const res = await fetch(`${COUNT_URL}get/${NAMESPACE}/${KEY}`);
-      const data = await res.json();
-      counterNum.textContent = (data.value || 0) + SEED;
-    } catch {
-      counterNum.textContent = SEED;
-    }
+  function updateCounterDisplay(val) {
+    counterNum.textContent = val;
   }
 
-  async function incrementCount() {
-    try {
-      const res = await fetch(`${COUNT_URL}hit/${NAMESPACE}/${KEY}`);
-      const data = await res.json();
-      counterNum.textContent = (data.value || 0) + SEED;
-    } catch {
-      // silently fail — counter not critical
+  function getStoredCount() {
+    // Get count from local storage, or start with seed + a small random number for realism
+    let stored = localStorage.getItem('mypeer_waitlist_count');
+    if (!stored) {
+      const randomInitial = SEED + Math.floor(Math.random() * 15); 
+      localStorage.setItem('mypeer_waitlist_count', randomInitial);
+      return randomInitial;
     }
+    return parseInt(stored);
   }
 
-  // Load count on page open
-  getCount();
+  function incrementCount() {
+    let current = getStoredCount();
+    let newCount = current + 1;
+    localStorage.setItem('mypeer_waitlist_count', newCount);
+    return newCount;
+  }
 
+  // Initialize counter on page load
+  updateCounterDisplay(getStoredCount());
+
+  // --- FORM SUBMISSION ---
   form.addEventListener('submit', async function(e) {
     e.preventDefault();
     btn.disabled = true;
     btn.innerHTML = '<i class="ti ti-loader-2"></i> Sending...';
+    
     try {
       const res = await fetch(form.action, {
         method: 'POST',
         body: new FormData(form),
         headers: { 'Accept': 'application/json' }
       });
+      
       if (res.ok) {
-        // Increment the persistent counter on successful submission
-        await incrementCount();
+        // Successfully submitted to Formspree -> Increment Local Counter
+        const updatedCount = incrementCount();
+        updateCounterDisplay(updatedCount);
+        
         document.getElementById('form-section').style.display = 'none';
         document.getElementById('success-section').style.display = 'block';
       } else {
         btn.disabled = false;
         btn.innerHTML = '<i class="ti ti-send"></i> Try again';
       }
-    } catch {
+    } catch (err) {
       btn.disabled = false;
       btn.innerHTML = '<i class="ti ti-send"></i> Try again';
     }
